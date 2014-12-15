@@ -1,0 +1,197 @@
+\documentclass[a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[latin1]{inputenc}
+\usepackage[french]{babel}
+
+\usepackage{geometry}
+\geometry{hmargin=2.5cm , vmargin=2cm}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{placeins}
+\usepackage[export]{adjustbox}
+\usepackage{epstopdf}
+
+
+\usepackage{listings}
+\lstset{
+        language=vhdl,
+        numbers=left,
+        numbersep=5pt,
+        numberstyle=\tiny
+}
+
+\begin{document}
+
+\title{Implémentations de systèmes numériques sur FPGA à l'aide du langage VHDL}
+\author{Mathieu ALLARD}
+%\date{M1MNE 2013/2014 Semestre 2}
+\begin{titlepage}
+\maketitle
+\thispagestyle{empty}
+\begin{figure}[t!]
+        \begin{center}
+                \includegraphics[width=2in,right]{logo.eps}
+        \end{center}
+\end{figure}
+\FloatBarrier
+\end{titlepage}
+\newpage
+\setcounter{page}{1}
+
+
+%--------------------------------------------------------------
+\section*{Objectifs}
+
+On veut réaliser un compteur de fibonacci avec affichages sur blocs 7 segments, 
+avec détection d'overflow et communication sur port série de l'état du système.  
+(valeur bonne ou erronnée)
+La description des composants, comme l'assemblage sera réalisé entièrement en 
+VHDL, à implanter sur une carte FPGA Altera DE2. On utilisera différents 
+composants de cette dernière pour le système. (switchs, leds, afficheurs, 
+Clock, transmission série)
+
+
+%--------------------------------------------------------------
+\section{Tutoriel et explications}
+Suivi du tutoriel pour la prise en main des outils et de la carte altera DE2
+Tout du long, nous allons suivre la méthode suivante pour chaque partie :
+\begin{itemize}
+        \item réalisation du code vhdl
+        \item réalisation d'un testbench
+        \item simulation
+        \item implantation sur la carte et test
+\end{itemize}
+
+Dans les faits, les simulations n'ont pas toujours été réalisés, certains 
+éléments étant relativement simples à faire fonctionner directement.
+Je n'ai pas pris la peine de joindre les testbenchs. Ceux-ci ont été réalisés 
+graphiquement avec un outil de Quartus.
+
+%--------------------------------------------------------------
+\section{Décodeur 7 segments}
+En vue d'afficher la suite, il faut convertir les 4*4 bits du compteur en 
+symboles pour les afficheurs 7 segments.(donc 4*7 bits)
+Ces derniers fonctionnant en logique négative, un '0' allume un segment et un 
+'1' l'éteint. Par exemple "0011" (3) deviendra "0000110"
+Exemple de code : 
+\lstinputlisting{exemple7seg.vhd}
+
+
+%--------------------------------------------------------------
+
+\section{diviseur d'horloge}
+On veut afficher les termes de la suite à une cadence d'environ 1 terme/sec. Il 
+faut donc utiliser un des timer présents sur la carte et en diviser la 
+fréquence.
+La particularité ici est que l'on ne veut pas d'une horloge à 1Hz, mais d'un 
+timer qui ne donne qu'une brève impulsion chaque seconde.
+%\begin{figure}
+%        \includegraphics{clkdiv.png}
+%\end{figure}
+%\FloatBarrier
+On utilise le timer 50MHz
+On va donc, comme pour un diviseur d'horloge "classique", incrémenter un 
+compteur à chaque impulsion, de 0 à 49 999 999 pour avoir en sortie une 
+impulsion à 1Hz. Seulement cette fois, on va remettre à zéro le signal en 
+sortie à la clock suivante.
+\lstinputlisting{exempleclkdiv.vhd}
+
+%--------------------------------------------------------------
+\newpage
+\section{Générateur de la suite de Fibonacci}
+\textit{Le code est disponible en annexe.}
+J'ai pris comme base le code réalisé au premier semestre en TP VHDL.
+On veut cette fois avoir une sortie sur 16 bits.
+\paragraph{Principe de fonctionnement}
+Soient $T_n$ les termes de la suite, on a : $T_{n} = T_{n-1} + T_{n-2} $
+Afin de pouvoir afficher les premiers termes et prévoir l'overflow au bon 
+moment, il nous faut 3 variables : $a=T_{n}$, $b=T_{n-1}$, $c=T_{n-2}$
+\lstinputlisting{termes.vhd}
+$a$ et $b$sont initialisées à X"0001", $c$ à X"0000".
+$c$ permet de prévoir l'overflow un coup d'horloge à l'avance afin de pouvoir 
+lever le flag au bon moment.
+On affiche $b$ afin d'avoir les bons premiers termes de la suite (les deux 
+premiers termes étant "1")\\
+
+Ensuite, N, réglable sur des switchs, permet de choisir à partir de combien de 
+termes on s'arrête de ceompter et on revient à zéro. Le reset est synchrone : 
+le process n'est sensible qu'à CLK.
+
+Enfin, on ajoute une sortie DataIN à transmettre à l'USART : les caractères E 
+ou B à envoyer indiquant si la valeur est bonne ou non.
+Il faut encoder ces caractères en ascii sur 8 bits : \\
+B=dec"66"=bin"01000010"
+E=dec"69"=bin"01000101"
+%--------------------------------------------------------------
+\section{Réalisation de l'USART}
+\textit{Les codes de l'usart et du baudgen sont disponibles en annexe}
+\subsection{Baudgen}
+L'USART en soi ne définissant pas la vitesse de transmission, il faut un autre 
+bloc pour cadencer celà à une vitesse respectant le protocole RS232.
+On veut pouvoir choisir entre 9600 et 19200 bauds, il faudra donc 2 diviseurs 
+d'horloge délivrant un signal à ces fréquences que l'on enverra à l'usart.
+Attention, le système ne fonctionne qu'avec une seule véritable horloge : celle 
+du système à 50Mhz, l'USART ne dérogera pas à la règle et le signal délivré par 
+le baudgen ne servira pas d'horloge.
+
+\subsection{USART}
+L'USART reçoit un signal sur 8bits sur DataIN et l'envoie sur le port série bit 
+à bit avec un start bit et un stop bit au début et à la fin de la transmission.
+La transmission se fait du LSB vers le MSB.\\
+On crée un compteur qui va permettre de cadencer l'envoi du signal avec le 
+baudgen en emettant un start bit à 0, le message bit à bit sur 8bits puis le 
+stop bit.
+
+La variable start est mise à zéro à la fin de l'envoi, et reçoit starttr 
+(implémenté sur un switch) au début du programme, celà permet d'éviter l'envoi 
+de trop de caractères d'un coup. Il aurait fallu utiliser une détection sur 
+front de l'interrupteur pour que ce système fonctionne, ici trop de caractères 
+sont envoyés à chaque transmission.
+
+%--------------------------------------------------------------
+\newpage
+\section{Assemblage et réalisation du séquenceur contrôlant les différents 
+blocs}
+\textit{code disponible en annexe}
+
+On crée un fichier top.vhd dans lequel on va instancier tous les composants 
+précédents. (voir annexe)
+Dans l'entité on déclare les ports extérieurs à assigner à des pins, 
+afficheurs, interrupteurs...
+Puis dans l'architecture, on déclare des signaux correspondant aux signaux 
+internes entre les composants.
+
+Chaque composant est décrit par ses ports d'entrées/sorties.
+Enfin, on termine par la description du composant "général" en assignant les 
+signaux entre les composants avec PORT MAP.
+
+\section{Problèmes rencontrés}
+Le tutoriel était plutôt facile à suivre et la prise en main du logiciel 
+Quartus n'a pas posé de problème particulier.\\
+Par la suite, certaines précautions ont été necessaires : la remise à zéro doit 
+être synchrone, à vérifier dans les programmes.\\ Si on veut utiliser un bouton 
+poussoir il est préférable de faire une détection sur front que sur état. J'ai 
+choisi d'utiliser uniquement des switchs.
+
+La partie la plus complexe à réaliser est l'USART, je n'ai pas réussi à le 
+rendre tout à fait fonctionnel.\\
+Comme énoncé précédemment, le système d'envoi d'un seul caractère ne fonctionne 
+pas, j'en ai compris la raison bien trop tard pour avoir le temps de le 
+corriger.
+Concernant l'affichage des caractères il faut faire attention au sens des 
+vecteurs de bits à envoyer sur les afficheurs 7 segments, dans mon cas les 
+caractères envoyés ne sont pas les bons, je n'ai pas eu le temps de trouver 
+l'erreur à corriger.
+
+%--------------------------------------------------------------
+\newpage
+\appendix
+\pagestyle{empty}
+\section*{annexe : code, Fibonacci }
+\lstinputlisting{fibo.vhd }
+\section*{annexe : code, Baudgen et USART}
+\lstinputlisting{usart.vhd }
+\lstinputlisting{baudgen.vhd }
+\section*{annexe : code, assemblage }
+\lstinputlisting{top.vhd }
+\end{document}

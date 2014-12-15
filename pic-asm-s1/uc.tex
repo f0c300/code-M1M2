@@ -1,0 +1,259 @@
+\documentclass{article}
+\usepackage[latin1]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{color}
+\definecolor{myred}{rgb}{0.7,0,0}
+\definecolor{myblue}{rgb}{0,0,0.7}
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{mygrey}{rgb}{0.5,0.5,0.5}
+\makeatletter
+\usepackage{listings}
+\lstset{
+language=[x86masm]Assembler,
+numbers=left,
+numbersep=5pt,
+numberstyle=\tiny\color{mygrey},
+stringstyle=\color{myred},
+commentstyle=\color{myblue},
+keywordstyle=\color{myred},
+}
+\usepackage{geometry}
+\geometry{hmargin=2.5cm, vmargin=1.5cm}
+
+
+\begin{document}
+
+\title{Réalisation d'un système d'acquisition série pour PC}
+\author{Mathieu Allard}
+\date{M1MNE 2013/2014 Semestre 1}
+
+\maketitle
+\section*{Présentation et Objectifs}
+On se propose de réaliser un système d'acquisition d'une grandeur analogique pour PC, via le port série, on utilisera un micro-contrôleur PIC16F877.
+Le développement se fera à l'aide du logiciel MPLAB, en assembleur.
+On divise le programme en plusieurs sous-programmes que l'on a testé au fur et à mesure, séparément.
+\begin{enumerate}
+\item Acqusition d'une valeur
+\item Emission de caractères ascii sur l'hyperterminal (port série) avec l'USART
+\item Transcodage Binaire-Ascii
+\item Utilisation du timer et des interruptions
+\item Utilisation des interruptions clavier (réception de caractères ascii)
+\item Choix d'un mode de fonctionnement
+\end{enumerate}
+
+\newpage
+\section{Acquisition d'une valeur}
+On commence avec le fichier "tutor\_pic.asm" qui envoie un nombre codé en binaire sur les diodes de la "Demo Board" du contrôleur, selon la tension réglée par un potentiomètre présent sur cette même carte.
+
+On le modifie de telle sorte que le nombre ne soit pas envoyé sur les leds (PORTB) mais dans une valeur "valeur" que l'on stocke en 0x71 (0x70 étant réservé par le debugger).
+\subsection*{Description du programme}
+\emph{lignes 114-119 et 78-83 en annexe} \\
+
+\emph{NB : La partie concernant TRISB/PORTB n'est pas présente dans le code final, on ne veut faire qu'une simple acquisition dans un registre que l'on va utiliser par la suite pour convertir et afficher la valeur.} \\
+
+TRISB permet de choisir l'utilisation de PORTB en entrée ou en sortie, en initialisant tous ses bits à 0 avec clrf, les 8bits de PORTB seront utilisés en tant que sortie.\\	
+	Des leds sont branchées sur PORTB, permettant d'observer la valeur que l'on va passer au registre.\\
+
+Les lignes suivantes configurent le convertisseur Analogique/Numérique.\\
+ADCON1 ('00001110')paramètre les sorties affectées : 
+\begin{itemize}
+	\item Le bit 7, ADFM donne le format du résultat, ici  
+	\item Les bits 6,5,4 ne sont pas utilisés
+	\item les bits PCFG3-0 configurent les ports : ici on utilise juste AN0/RA0 en entrée analogique et les autres (AN1-7/RA1-7) en entrée-sortie numérique. Cela affecte aussi les valeurs VDD et VSS à VREF+ et VREF-.
+\end{itemize} 
+ADCON0 ('01000001') paramètre la conversion des données :
+\begin{itemize}
+	\item les 2 bits les plus forts ADCS1,ADCS0 à "01" indiquent la fréquence utilisée, ici fosc/8.
+	\item Les 3 bits suivant CHS2,CHS1,CHS0 "000" sélectionnent la "channel", soit les pins des entrées à convertir.
+	\item Le bit suivant GO, à "0" indique qu'il n'y a pas de conversion en cours.
+	\item Le bit1 ???
+	\item Enfin, le dernier bit, ADON à "1" active la conversion anlogique-numérique.
+\end{itemize}
+Le résultat est stocké dans ADRESH \\
+
+Pour démarrer une conversion on met le bit GO de ADCON0 à 1
+Le programme entre dans une bouclei tant que GO n'est pas repassé à 0, indiquant que la conversion est terminée pour s'assurer d'avoir la bonne valeur.
+
+%SWAPF ADRESH,W %???
+
+Et à la fin, la valeur convertie dans ADRESH est déplacée dans PORTB pour être affichée sur les leds.
+Dans notre cas, on change "PORTB" par "valeur" pour que l'acquisition soit stockée dans un registre utilisable par la suite.
+
+\newpage
+\section{Communication de caractères ascii sur le port série}
+On va maintenant écrire un sous-programme permettant de communiquer avec l'hyperterminal, on veut y afficher un caractère ascii précédemment tapé au clavier.
+
+\subsection*{Description du code}
+\emph{lignes 85-93 pour l'initialisation, 28-29 RCREG, 176-209 TXREG }
+\subsubsection*{Initialisation}
+Il faut choisir une vitesse de transmission, on veut ici un baud rate de 9600, d'après la doc(p98) il faut donner au registre SPBRG la valeur 25, en décimal pour un processeur à 4Mhz à une telle vitesse.
+
+Ensuite, le registre RCSTA ('10010000') concerne la réception par le port série : 
+\begin{itemize}
+	\item Le bit 7 active le port série, il faut le mettre à 1
+	\item '0'sur le bit 6 permet de travailler en 8bits
+	\item On utilise le mode asynchrone, le bit 5 n'a pas d'importance
+	\item En activant le bit 4, on active la réception de données en continu (necessaire pour la suite puisqu'on veut travailler avec des interruptions clavier)
+	\item les derniers bits ne nous intéressent pas, on désactive leurs fonctions.
+\end{itemize}
+Et TXSTA ('00100100') concerne l'émission de données :
+\begin{itemize}
+	\item En asynchrone, le bit 7 n'importe pas
+	\item On sélectionne une transmission 8-bits en mettant le bit 6 à '0'
+	\item On active la transmission avec le bit 5 à '1'
+	\item le bit 4 à '0' choisit le mode de fonctionnement asynchrone
+	\item le bit 3 n'est pas implémenté
+	\item Le bit 2 à '1' sélectionne "high speed" en mode asynchrone
+	\item Le bit 1 (TRMT) contrôle si le registre TSR est vide ou plein
+	\item Le dernier bit ne sert qu'au mode de transfert 9 bits
+\end {itemize}
+\subsubsection*{programme}
+
+Les valeurs en ascii tapées au clavier sont stockées dans le registre RCREG, on va alors copier sa valeur dans "command" le registre initialisé au début en 0x77.\\
+
+Ensuite, la valeur en code ascii dans TXREG est affichée dans l'hyperterminal, on va donc y placer les caractères que l'on veut afficher.
+
+\newpage
+\section{Conversion Binaire-Ascii}
+
+Maintenant que l'on peut faire une acquisition de valeur et envoyer des caractères ascii sur l'hyperterminal, on veut pouvoir convertir les valeurs mesurées en ascii pour pouvoir les afficher.
+La valeur avec laquelle on travaille est codée sur 8 bits, c'est un nombre "valeur" décimal compris en 0 et 255.
+Il représente en réalité une tension comprise en 0 et 5 volts, on va donc faire la conversion.
+
+L'unité est le résultat de la divion de "valeur" par 51, 255 étant égal à 5, le maximum.
+On procède par soustractions successives, en incrméntant un compteur, tant que le reste est positif.
+
+Exemple, si valeur =110 :
+$110-51=59 ; unité=unité+1$ \\
+$59-51=8 ; unité=unité+1$ \\
+$8-51=-43 ; on s'arrête$ \\
+
+
+Pour la partie décimale on va procéder de la même façon avec le reste des soustractions précédentes, attention à rajouter 51 à ce reste pour retrouver sa véritable valeur.
+
+Une unité = 51, une decimale vaudra donc $51/10=5.1$, seulement, on ne peut pas avoir cette précision, on prendra donc 5 plutôt que 5.1, et on effectue à nouveau les soustractions, avec 5 cette fois et en incrémentant un autre compteur correspondant aux décimales.
+
+Enfin, il reste un petit problème, dû à l'approximation 5.1 = 5, si le reste après calcul de l'unité est égal à 50, on va se retrouver avec une partie décimale de 10.
+Ce cas est peu probable : il y a 5 chances sur 255 mais mieux vaut y pallier.
+La solution est simple : si on rencontre ce cas, on ne va pas calculer la partie décimale, mais l'arrondir à 9.
+Enfin, pour encoder une valeur décimale est un caractère ascii y correspondant, on ajoute 30.
+(30=0 31=1 etc..)
+
+\subsection*{description du code}
+\emph{lignes 124-168 en annexe}
+On a besoin de plusieurs variables pour cette partie : valeur, qui contient la valeur analogique, unite la partie entière, et decim la partie décimale.\\
+
+L'instruction btfsc/btfss on peut tester le bit d'un registre et sauter l'intruction suivante selon le résultat.\\
+On teste ici le bit C de STATUS : s'il est à '0', cela signifie qu'il n'y a pas de reste à notre soustraction. (ou que ce reste est <0)\\
+De même, le bit Z est à '1' si le résultat d'une opération arithémtique est égale à 0, et à '0' sinon.\\
+
+Lorsque l'on arrive dans la partie conversion, on s'assure d'abord que le registre "unite" est remis à 0 après une précédente conversion, puis on affecte "51" en décimal à w, que l'on va retirer à la valeur mesurée. (substract W from F).
+On fait alors le test sur le bit C de status pour savoir si on incrémente ou non unite, selon le résultat du reste de la division, si on a incrémenté unite, alors on va procéder à une soustraction suivante en revenant au début de la boucle.
+
+Une fois le reste nul, on passe à la suite, on remet la valeur en positif en lui ajoutant "51", et on effectue les calculs pour la partie décimale. \\
+
+Juste avant de procéder de la même façon pour les soustractions successives pour la partie décimale, on s'assure que le reste à tester n'est pas égal à 50. C'est dans cette partie qu'on teste le bit Z de STATUS après soustraction de "50" à valeur, si Z est à 1, on va directement au résultat après avoir affecté "9" à la partie décimale.
+
+
+\newpage
+\section{Timer et interruptions}
+On veut maintenant être capable d'afficher les valeurs à intervalles réguliers d'une seconde, la fonction timer du PIC va nous permettre de le réaliser.
+On utilise timer0.
+Le micro-contrôleur est cadencé à fosc=4Mhz, en entrée du timer on a fosc/4=1Mhz.
+Timer0 compte sur 8bits et lève un flag TOIF de INTCON lorsqu'il arrive au bout, soit toutes les 256 micro-secondes.
+On peut l'utiliser avec un prescaler à un ratio jusqu'à 1/256, ce qui signifie que notre timer va lever un flag toutes les 256*256=65ms.\\
+
+On travaille ici avec les interruptions, cela signifie qu'à chaque fois que le timer a compté 256*256, le flag TOIF se lève et on interromp le programme pour entrer dans une routine d'interruption.
+Lors d'une interruption, le programme va éxécuter les instructions en 0x04 jusqu'à retfie qui le fait revenir où il était précédemment.
+% et donc ?
+Pour obtenir un affichage par seconde il va falloir compter 15 interruptions (65*15=975ms soit environ 1 seconde, la précision n'étant pas importante dans notre cas) et afficher notre valeur seulement après.
+On va donc utiliser un compteur dans la routine d'interruption qui retourne attendre 15 interruptions timer avant d'appeler le programme d'acquisition/conversion/affichage.
+\subsection*{description du code}
+\emph{initialisation lignes 94-98, interruption lignes 53-71 en annexe}
+\subsubsection*{Initialisation}
+
+On utilise timer0 qui s'initialise avec le registre OPTION\_REG ('00000111')
+\begin{itemize}
+	\item Les deux premiers bits ne nous intéressent pas
+	\item le bit 5 (TOCS) à '0' sélectionne l'horloge interne
+	\item le bit TOSE à '0' choisit une incrémentation à front montant
+	\item le bit 3 (PSA) assigne le prescaler à timer0
+	\item les bits PS2:PS0 sélectionnent le ratio du prescaler, ici 1:256 le maximum
+\end{itemize}
+
+\subsubsection*{Compteur}
+
+Dès le début, on remet à '0' manuellement le flag TOIF, pour que les interruptions suivantes puissent avoir lieu.\\
+
+Une variable "count" est incrémentée avec incf à chaque passage.\\
+Puis on effectue l'opération de soustraction de w=15 à count, on place le résultat dans w pour ne pas avoir à remettre count à sa "bonne" valeur à chaque fois.
+
+On teste alors le résultat de la soustraction avec le bit Z de STATUS, tant qu'il est à 0, on quitte l'interruption directement.
+
+Lorsque l'on a atteint la 15eme interruption timer, le bit Z de status sera à '1', on va alors appeler le programme d'acquisition/conversion/affichage puis remettre count à 0, et enfin quitter l'interruption.
+
+\newpage
+\section{Interruptions clavier et mode de fonctionnement}
+Pour finaliser le programme, on veut qu'il fonctionne dans deux modes différents : 
+\begin{itemize}
+	\item Automatique : une acquisition chaque seconde
+	\item Manuel : une acquisition lorsque l'on appuie sur la touche %
+	\item Il faut que le programme réponde à une touche pour changer de mode : a pour passer en automatique, XXX pour passer en manuel
+\end{itemize}
+Il va donc falloir executer différentes instructions selon la touche appuyée pour construire les deux modes.
+
+Pour autoriser les interruptions clavier  on autorise les interruptions usart, périphériques, et globales.
+Pour cela on met à 1 le bit RCIE de PIE1 et les bits PEIE et GEIE du registre INTCON.
+On contrôle également le bit 4 de RCSTA qui active la détection de valeurs venant du clavier en continu.
+Le programme s'interromp maintenant de la même façon qu'avec le timer dès que l'on presse une touche sur le clavier.
+Il va donc falloir tester dans cette routined'où viennent les interruptions.
+\subsection*{Structure du programme }
+Lorsque le timer ou le clavier provoque une interruption, on entre dans une routine à org0x04, et on effectue des opérations pour déterminer la provenance d'une interruption : \\
+D'abord on regarde si ça vient du clavier : si ce n'est pas le cas elle vient donc du timer, on est en mode automatique (on prend soin de désactiver le timer si on passe en mode manuel) on va alors à notre compteur auto, et lorsqu'il arrive à 15 on appelle le programme (acqusition-conversion-affichage) \\.
+Si l'interruption vient du clavier on va tester différentes lettres :
+\begin{itemize}
+	\item si c'est r, on désactive les interruptions timer pour passer en mode manuel
+	\item si c'est a, on va dans le mode automatique (cette routine active (ou réactive) les interruptions clavier
+	\item si c'est d, on appelle le programme, après s'être assuré que les interruptions soient désactivées (donc que l'on est bien en mode manuel)
+\end{itemize}
+
+\subsection*{description du code}
+\emph{initialisation lignes 100-104 choix du mode lignes 24-50}
+La routine d'interruption va faire appel au programme d'acquisition soit quand on appuie sur une touche, soit chaque seconde : 
+
+Les premières instructions testent le bit PIR1 de RCIF qui est à 1 si le clavier a reçu une valeur, si ce n'est pas le cas, on va en mode automatique, où l'on fait une acquisition par seconde, son fonctionnement est décrit à la page précédente.\\
+
+Si l'interruption vient du clavier, il va falloir tester de quelle touche elle provient pour décider du comportement du programme.\\
+Le test est à chaque fois une soustraction de la valeur en ascii d'un caractère avec "command" le registre dans lequel on stocke la valeur de RCREG.\\
+\begin{itemize}
+	\item Si c'est r, on passe le bit TOIE de INTCON à 0, ce dernier masque le flag TOIF, on aura donc plus d'interruptions venant du timer : on est en mode manuel
+	\item si c'est a, on va en mode automatique, où l'on remet TOIE à '1' et où l'on fait une acquisition chaque seconde.
+	\item si c'est d, on apelle directement le programme d'acquisition/conversion/affichage, mais seulement après avoir vérifié que TOIE est à '0' soit que l'on est bien en mode manuel.
+\end{itemize}
+
+
+\newpage
+\section{Programme complet}
+\emph{cette partie récapitule l'utilisation des sous-programmes et le déroulement général de notre programme}
+
+\subsection*{les différentes parties du programme : }
+\begin{itemize}
+	\item Initialisation
+	\item main
+	\item irq, routine d'interruption
+	\item Programme, contenant les directives d'acquisition, de conversion et d'affichage
+\end{itemize}
+
+Lorsque l'on lance le programme il passe dans une phase d'initialisation où l'on configure le convertisseur numérique, la communication avec l'hyperterminal, les autorisations d'interruption, et le timer, par défaut on est en mode automatique. Il va ensuite dans la boucle "main", et attend une interruption.\\
+
+En général, lors d'une interruption, on sauvegarde le contexte, cependant ce n'est pas utile ici, d'où les lignes concernant la sauvegarde de status et w commentées.\\
+La routine d'interruption paramètre les différents modes en activant/désactivant les interruptions dûes au timer.
+C'est également elle qui appelle le programme dans les différents cas correspondants au mode de fonctionnement en cours.
+\newpage
+\appendix
+\pagestyle{empty}
+\section*{Annexe : Code PIC utilisé}
+\lstinputlisting{acquisitionfinal.asm}
+
+\end{document}
