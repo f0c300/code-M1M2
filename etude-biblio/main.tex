@@ -1,0 +1,175 @@
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND OTHER DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+\documentclass[12pt]{article} % Default font size is 12pt, it can be changed here
+\usepackage{geometry} % Required to change the page size to A4
+\geometry{a4paper} % Set the page size to be A4 as opposed to the default US Letter
+
+\usepackage{graphicx} % Required for including pictures
+\usepackage{float} % Allows putting an [H] in \begin{figure} to specify the exact location of the figure
+\usepackage{wrapfig} % Allows in-line images such as the example fish picture
+\linespread{1.2} % Line spacing
+%\setlength\parindent{0pt} % Uncomment to remove all indentation from paragraphs
+\graphicspath{{Pictures/}} % Specifies the directory where pictures are stored
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[francais]{babel}
+\usepackage[nottoc,numbib]{tocbibind}
+\begin{document}
+%----------------------------------------------------------------------------------------
+%	TITLE PAGE
+%----------------------------------------------------------------------------------------
+\begin{titlepage}
+
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}} % Defines a new command for the horizontal lines, change thickness here
+\raggedright
+\includegraphics[width=2cm]{stras}\\[1cm] % Include a department/university logo - this will require the graphicx package
+\raggedleft
+\includegraphics[width=2cm]{pi}\\[1cm] % Include a department/university logo - this will require the graphicx package
+\center % Center everything on the page
+\textsc{\small Université de Strasbourg - Physique et Ingénierie}\\[1.5cm] % Name of your university/college
+\textsc{\small Master en Micro et Nano Électronique}\\[0.5cm] % Major heading such as course name
+\textsc{\large Étude bibliographique}\\[0.5cm] % Minor heading such as course title
+\HRule \\[0.4cm]
+{ \huge \bfseries Utilisation du concept Orienté Objet dans les Systèmes Embarqués}\\[0.4cm] % Title of your document
+\HRule \\[1.5cm]
+\begin{minipage}{0.4\textwidth}
+\begin{flushleft} \large
+Mathieu \textsc{Allard} % Your name
+\end{flushleft}
+\end{minipage}
+~
+{\large \today}\\[3cm] % Date, change the \today to a set date if you want to be precise
+\vfill % Fill the rest of the page with whitespace
+\end{titlepage}
+%----------------------------------------------------------------------------------------
+%	TABLE OF CONTENTS
+%----------------------------------------------------------------------------------------
+\renewcommand{\contentsname}{Table des Matières}
+\tableofcontents % Include a table of contents
+\newpage % Begins the essay on a new page instead of on the same page as the table of contents 
+%----------------------------------------------------------------------------------------
+%	INTRODUCTION
+%----------------------------------------------------------------------------------------
+
+\section{Définitions des thèmes abordés} % Major section
+\subsection{Les Systèmes Embarqués} 
+Certaines applications ont des besoins spécifiques, nécessitant un système autonome, spécialisé dans une tâche bien précise. Ces systèmes doivent généralement se plier à de nombreuses contraintes (Temps réel, sûretée, sécurité) et sont souvent limités en taille et en ressources, rendant leur développement complexe, l'optimisation devant être maximale.
+Cependant, aujourd'hui grâce aux avancées technologiques en matière de microprocesseurs/microcontroleurs ces systèmes deviennent de plus en plus puissants, permettant des calculs toujours plus complexes, comme par exemple un DSP avec un processeur multicoeur.\cite{MulticoreDSP}\\
+Le choix du language de programmation de tels systèmes entre alors en jeu, les possibilités étant étendues et la complexité des programmes accrue. On peut alors se permettre de travailler à un niveau d'abstraction plus élevé et utiliser des concepts plus complexes, tout en respectant les contraintes imposées.
+%------------------------------------------------
+\subsection{Le paradigme Objet} 
+Afin de respecter les contraintes décrites précédemment, on utilisait généralement des languages de programmation procéduraux, voire de l'assembleur, afin d'être au plus proche du matériel.
+Mais depuis le début des années 90, l'utilisation de language Orienté Objet est maintenant possible et autorise des performances acceptables.\cite{TimeCritical}\\
+Le paradigme objet représente les choses décomposées en objets pouvant interagir entre eux. Un objet est l'instance d'une classe, qui est la descritpion d'un concept (basé sur le monde réel ou abstrait).
+Nécessitant de réfléchir le design plus en amont et amenant une forme de réflexion différente (objets, encapsulation, ), ce paradigme se révèle utile surtout dans le cas d'un programme d'une taille considérable.
+Il reste néanmoins de nombreux défis à relever, tels que la portabilité, en effet certains systèmes ne bénéficient toujours pas d'un compilateur efficace\cite{DesignPattern} ou l'optimisation : par exemple un programme en C++ sera généralement un peu plus gourmand qu'un programme en C.\cite{OOPEfficient}
+%------------------------------------------------
+\subsection{Contenu de l'étude}
+On se propose dans cette étude d'observer la situation de ces dernières années dans le champ des systèmes embarqués : le paradigme objet est-il souvent utilisé dans des situations critiques? 
+Quels sont les avantages d'un langage orienté objet? Ses inconvénients?
+Quel intérêt peut-on avoir à apprendre un language de programmation orienté objet?
+
+
+\newpage
+%----------------------------------------------------------------------------------------
+%	MAJOR SECTION 1
+%----------------------------------------------------------------------------------------
+
+\section{Synthèse des documents} 
+
+
+\subsection{Concepts intéressants du paradigme objet}
+On ne retiendra pas tout au sujet du paradigme objet dans le cas d'une utilisation avec des systèmes embarqués. Certains languages permettent par exemple d'utiliser un rammasse-miette ("garbage collector") pour désallouer automatiquement les emplacements mémoire, ce qui, dans notre étude ne nous intéressera pas puisqu'il est plus judicieux de gérer ce genre de paramètre plus finement. 
+On s'attardera surtout sur les concepts suivants :
+Je me suis, pour les parties suivantes, référé au cours disponible en ligne de Derek Molloy\cite{OOPEmbedded}
+\subsubsection{L'Héritage}
+L'héritage consiste à pouvoir créer une classe à partir d'une classe déjà existante, d'en récupérer les attributs et méthodes, et éventuellement d'en ajouter.
+Cela permet de bien ordonner ses objets, qui auront ainsi entre eux des relations "père-fils".
+\begin{wrapfigure}{l}{0.5\textwidth} % Inline image example
+  \begin{center}
+    \includegraphics[width=0.48\textwidth]{basederived}
+  \end{center}
+  \caption{Classes dérivées}
+\end{wrapfigure}
+Par exemple dans le cadre de l'utilisation de capteurs divers sur un système, on peut imaginer une classe de base capteur, ayant des classes dérivées "position","température" qui peuvent encore en avoir "fabricant1", "fabricant2".
+Cela permet de simplifier grandement la compréhension de certains programmes s'ils sont amenés à devoir gérer un grand nombre de capteurs. (ici des objets)
+\subsubsection{Le Polymorphisme}
+Le polymorphisme, littéralement "plusieurs formes" se réfère aux différentes formes d'une méthode car utilisée sur plusieurs classes. Elle n'aura pas necessairement le même comportement, ces classes pouvant être de type différent.
+
+%------------------------------------------------
+\subsection{Ce que permet l'utilisation du paradigme objet}
+%quand, comment utiliser ça, pourquoi?
+N'ayant donné qu'un bref aperçu des concepts utilisés en paradigme objet, on va s'attarder ici sur des exemples plus concrets d'utilisation.
+\subsubsection{Une utilisation large}
+L'utilisation de couches d'abstraction est courante lors de l'élaboration de systèmes complexes,\cite{SystematicApproach}ainsi que le développement en amont du système à déployer. La modélisation objet est aussi une façon de procéder à cela. 
+Bien qu'historiquement inventé en tant que paradigme de programmation avec le langage smalltalk, il est possible d'utiliser le paradigme objet afin de développer d'autres systèmes. Avec UML (Unified Modeling Language) par exemple on peut modéliser graphiquement un système, notamment avec un diagramme de classes.
+
+
+\subsubsection{Complexité du hardware}
+Un processeur multicoeurs est équivalent à plusieurs processeurs sur une même puce. Pour utiliser ces multiples processeurs, un programme doit être écrit et compilé spécifiquement.\cite{Multithread}\cite{MulticoreDSP}
+En effet, aujourd'hui les systèmes peuvent être plus complexes, cependant est-ce vraiment beaucoup utilisé?
+
+%------------------------------------------------
+\subsection{Usage du paradigme objet aujourd'hui}
+%performances, où en est-on aujourd'hui? 
+De plus en plus populaire dans de nombreux domaines, cela fait de nombreuses années que des languages de programmation orientés objet sont utilisés sur des systèmes embarqués.\cite{TimeCritical}
+Bien qu'il soit aujourd'hui possible d'utiliser des composants extrêmement puissants, on se limitera généralement à l'essentiel dans le cas de systèmes embarqués.
+Et même dans des cas plus complexes, ce n'est pas toujours intéressant.\cite{DesignPattern}
+
+Le problème de la portabilité est de moins en moins fréquent, on peut trouver des compilateurs très efficaces pour de nombreuses plateformes.\cite{MulticoreDSP}\cite{JustInTime}\\
+
+
+Une mise au point sur les technologies actuelles pourrait être faite afin de mieux comprendre le propos tenu dans cet exposé. 
+Notamment sur la puissance du hardware et complexité des systèmes, par exemple des processeurs à plusieurs coeurs peuvent être utilisés pour réaliser des DSP\cite{MulticoreDSP} ou sur l'optimisation du compilateur et la portabilité du programme.
+Cependant ce n'est pas la dessus que j'ai décidé de me pencher au cours de la partie suivante mais plutôt sur une expérience personnelle afin de mettre en relation ce travail avec celui que j'effectue actuellement en stage de fin d'étude.
+
+%----------------------------------------------------------------------------------------
+%	MAJOR SECTION 2
+%----------------------------------------------------------------------------------------
+
+\newpage
+\section{Analyse personnelle}
+%------------------------------------------------
+\subsection{Apprendre la programmation orientée objet - mon expérience}
+\subsubsection{Des programmes non critiques}
+Au cours de mon stage, j'ai du apprendre à programmer en C\#, language de programmation orienté objet, afin de réaliser une interface homme-machin sur un poste client à l'aide du framework .NET.
+N'ayant jusqu'alors jamais utilisé de tels concepts, je m'y suis intéressé d'assez près pour mener à bien ma tache.
+Le programme en question n'est pas bien complexe, il permet seulement de se connecter sur un système, choisir différents capteurs et entrées associées, et enfin d'éventuellement effectuer une correction sur la valeur qu'ils renvoient.
+Seulement, rien que le fait d'utiliser de nombreuses boîtes de sélection/boutons/affichages rend la chose assez complexe et il est bien aisé de les considérer comme objets.
+
+\subsubsection{Programmation procédurale }
+Toujours dans le cadre de mon stage, j'ai eu l'occasion d'étudier certains programmes faisant des appels au noyau (ioctl) écrits en C, pour des systèmes ayant des ressources réduites.
+N'ayant pas assez de recul et d'expérience, je ne peux me prononcer quand à l'intérêt potentiel que l'on pourrait avoir à ce que ces mêmes programmes soient en C++ par exemple.
+Ces programmes bien que pas toujours très bien écrits, n'ont pas besoin d'être modifiés, étant éprouvés depuis des années sur une structure bien établie, et suffisamment clairs pour être maintenus.
+%----------------------------------------------------------------------------------------
+%	CONCLUSION
+%----------------------------------------------------------------------------------------
+\newpage
+\section{Conclusion}
+Cette étude nous a fait nous pencher sur les différentes possibilités existantes aujourd'hui de programmation pour systèmes embarqués, ainsi que sur quelques exemples d'utilisation dans le cadre de systèmes complexes.
+On peut en venir à se questionner sur les limites du paradigme objet, à partir de quand il devient préférable de l'utiliser, et dans quels cas il convient de s'en servir. À ce propos, des publications telles que "Object Oriented Vs Procedural Programming in Embedded Systems" \cite{OOPvsProcedural}tentent d'apporter des éléments de réponse. On peut également noter que c'est un sujet discuté sur de nombreux forums en ligne.
+
+%----------------------------------------------------------------------------------------
+%	BIBLIOGRAPHY
+%----------------------------------------------------------------------------------------
+\newpage
+%au cas où j'oublierais d'en citer un
+%\nocite{MulticoreDSP}
+%\nocite{DesignPattern}
+%\nocite{JustInTime}
+\nocite{LightweightComponent}
+%\nocite{Multithread}
+%\nocite{OOsoftware}
+%\nocite{OOPEfficient}
+\nocite{OOPvsProcedural}
+\nocite{PlatformDesign}
+%\nocite{SystematicApproach}
+%\nocite{TimeCritical}
+\nocite{OOPEmbedded}
+\bibliographystyle{plain}
+\bibliography{bib.bib} 
+
+%----------------------------------------------------------------------------------------
+
+\end{document}
